@@ -39,14 +39,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
           IconButton(
             icon: const Icon(Icons.bar_chart_rounded),
             tooltip: 'History',
-            onPressed: () =>
-                Navigator.pushNamed(context, AppRoutes.history),
+            onPressed: () => Navigator.pushNamed(context, AppRoutes.history),
           ),
           const SizedBox(width: 4),
         ],
       ),
+      // Consumer kullanırken hata durumlarını yakalamak için yapılandırıldı
       body: Consumer2<FoodProvider, DailyLogProvider>(
-        builder: (_, foodProv, logProv, __) {
+        builder: (context, foodProv, logProv, child) {
+          // Hata varsa kullanıcıya SnackBar ile göster ve hatayı temizle
+          if (logProv.errorMessage != null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(logProv.errorMessage!),
+                  backgroundColor: Colors.redAccent,
+                ),
+              );
+              logProv.clearError();
+            });
+          }
+
           if (logProv.isLoading || foodProv.isLoading) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -59,7 +72,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
               children: [
-                // ── Date label ──────────────────────────────────
                 Text(
                   logProv.todayDateFormatted,
                   style: TextStyle(
@@ -70,7 +82,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // ── Protein progress ─────────────────────────────
+                // Hedef protein miktarını 150-200g bandında tutmak için ayarlanmış bar
                 ProteinProgressBar(
                   current: summary.totalProtein,
                   goalMin: 150,
@@ -78,7 +90,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // ── Macro cards ──────────────────────────────────
                 Row(
                   children: [
                     Expanded(
@@ -129,20 +140,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                 const SizedBox(height: 26),
 
-                // ── Meals list ───────────────────────────────────
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
                       "Today's Meals",
-                      style: TextStyle(
-                          fontWeight: FontWeight.w700, fontSize: 16),
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
                     ),
                     Text(
-                      '${entries.length} item'
-                      '${entries.length == 1 ? '' : 's'}',
-                      style: TextStyle(
-                          color: Colors.grey.shade500, fontSize: 13),
+                      '${entries.length} item${entries.length == 1 ? '' : 's'}',
+                      style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
                     ),
                   ],
                 ),
@@ -152,11 +159,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _EmptyMealsPlaceholder()
                 else
                   ...entries.map(
-                    (e) => LogEntryCard(
+                        (e) => LogEntryCard(
                       key: ValueKey(e.log.id),
                       entry: e,
-                      onDelete: () =>
-                          context.read<DailyLogProvider>().deleteLog(e.log.id!),
+                      onDelete: () => context.read<DailyLogProvider>().deleteLog(e.log.id!),
                     ),
                   ),
               ],
@@ -165,8 +171,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         },
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () =>
-            Navigator.pushNamed(context, AppRoutes.foodList),
+        onPressed: () => Navigator.pushNamed(context, AppRoutes.foodList),
         icon: const Icon(Icons.add_rounded),
         label: const Text('Log Meal'),
       ),
@@ -182,8 +187,7 @@ class _EmptyMealsPlaceholder extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 36),
         child: Column(
           children: [
-            Icon(Icons.no_meals_rounded,
-                size: 60, color: Colors.grey.shade300),
+            Icon(Icons.no_meals_rounded, size: 60, color: Colors.grey.shade300),
             const SizedBox(height: 12),
             Text(
               'No meals logged yet.',
@@ -196,8 +200,7 @@ class _EmptyMealsPlaceholder extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               'Tap "Log Meal" to get started.',
-              style: TextStyle(
-                  color: Colors.grey.shade400, fontSize: 13),
+              style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
             ),
           ],
         ),

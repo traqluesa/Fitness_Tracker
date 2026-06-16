@@ -17,7 +17,18 @@ class DatabaseHelper {
   Future<Database> _initDatabase() async {
     final dbPath = await getDatabasesPath();
     final path = p.join(dbPath, 'fitness_tracker.db');
-    return openDatabase(path, version: 1, onCreate: _onCreate);
+    return openDatabase(
+      path,
+      version: 1,
+      onConfigure: _onConfigure, // Foreign Key'leri aktifleştirmek için eklendi
+      onCreate: _onCreate,
+      onUpgrade: _onUpgrade,     // İleriye dönük genişletilebilirlik eklendi
+    );
+  }
+
+  // SQLite'da Foreign Key desteğini zorunlu olarak açıyoruz
+  Future<void> _onConfigure(Database db) async {
+    await db.execute('PRAGMA foreign_keys = ON');
   }
 
   // ── Schema creation ──────────────────────────────────────────
@@ -48,41 +59,19 @@ class DatabaseHelper {
     await _seedFoodItems(db);
   }
 
+  // İleride 2. versiyona geçilirse veritabanı şemasını güncellemek için
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    // Gelecekte eklenecek kolonlar veya tablolar burada yönetilir
+  }
+
   // ── Seed data ────────────────────────────────────────────────
   Future<void> _seedFoodItems(Database db) async {
+    // 3. sınıf ders yoğunluğunda makro takibini kolaylaştıracak temel besinler
     const seeds = [
-      {
-        'name': 'Chicken Breast',
-        'portion_g': 100.0,
-        'calories': 165.0,
-        'protein_g': 31.0,
-        'carb_g': 0.0,
-        'fat_g': 3.6,
-      },
-      {
-        'name': 'Oatmeal',
-        'portion_g': 100.0,
-        'calories': 389.0,
-        'protein_g': 16.9,
-        'carb_g': 66.3,
-        'fat_g': 6.9,
-      },
-      {
-        'name': 'Rice Flour',
-        'portion_g': 100.0,
-        'calories': 366.0,
-        'protein_g': 6.0,
-        'carb_g': 80.0,
-        'fat_g': 1.4,
-      },
-      {
-        'name': 'Beef (Ground, Lean)',
-        'portion_g': 100.0,
-        'calories': 215.0,
-        'protein_g': 26.1,
-        'carb_g': 0.0,
-        'fat_g': 12.0,
-      },
+      {'name': 'Chicken Breast', 'portion_g': 100.0, 'calories': 165.0, 'protein_g': 31.0, 'carb_g': 0.0, 'fat_g': 3.6},
+      {'name': 'Oatmeal', 'portion_g': 100.0, 'calories': 389.0, 'protein_g': 16.9, 'carb_g': 66.3, 'fat_g': 6.9},
+      {'name': 'Rice Flour', 'portion_g': 100.0, 'calories': 366.0, 'protein_g': 6.0, 'carb_g': 80.0, 'fat_g': 1.4},
+      {'name': 'Beef (Ground, Lean)', 'portion_g': 100.0, 'calories': 215.0, 'protein_g': 26.1, 'carb_g': 0.0, 'fat_g': 12.0},
     ];
 
     final batch = db.batch();
