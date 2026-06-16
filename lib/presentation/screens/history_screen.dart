@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import '../providers/daily_log_provider.dart';
 import '../providers/food_provider.dart';
 
@@ -15,7 +16,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-
       final foodProv = context.read<FoodProvider>();
       context.read<DailyLogProvider>().loadHistory(foodProv.foodItemsMap);
     });
@@ -55,10 +55,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
             padding: const EdgeInsets.all(12),
             itemCount: logProv.historyDates.length,
             itemBuilder: (context, index) {
-              final date = logProv.historyDates[index];
-              final summary = logProv.historySummaries[date];
+              final rawDate = logProv.historyDates[index];
+              final summary = logProv.historySummaries[rawDate];
 
               if (summary == null) return const SizedBox.shrink();
+
+              // Tarihi okunabilir formata cevir (Orn: 2026-05-18 -> Monday, May 18)
+              String formattedDate = rawDate;
+              try {
+                final parsedDate = DateFormat('yyyy-MM-dd').parse(rawDate);
+                formattedDate = DateFormat('EEEE, MMM d').format(parsedDate);
+              } catch (e) {
+                // Parse hatasi olursa orijinal rawDate kalsin
+              }
 
               return Card(
                 margin: const EdgeInsets.symmetric(vertical: 6),
@@ -66,7 +75,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 child: ExpansionTile(
                   leading: const Icon(Icons.calendar_today_rounded, color: Colors.blueGrey),
                   title: Text(
-                    date,
+                    formattedDate,
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   subtitle: Text('${summary.totalCalories.toStringAsFixed(0)} kcal consumed'),

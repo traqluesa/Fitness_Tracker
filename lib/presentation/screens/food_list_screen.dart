@@ -38,7 +38,6 @@ class _FoodListScreenState extends State<FoodListScreen> {
       ),
       body: Consumer<FoodProvider>(
         builder: (context, foodProv, child) {
-
           if (foodProv.errorMessage != null) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -53,7 +52,6 @@ class _FoodListScreenState extends State<FoodListScreen> {
 
           return Column(
             children: [
-
               Padding(
                 padding: const EdgeInsets.all(12.0),
                 child: TextField(
@@ -77,12 +75,11 @@ class _FoodListScreenState extends State<FoodListScreen> {
                   ),
                 ),
               ),
-
               if (foodProv.isLoading)
                 const Expanded(child: Center(child: CircularProgressIndicator()))
               else if (foodProv.displayedItems.isEmpty)
                 const Expanded(
-                  child: Center(child: Text('No food matching the search criteria was found..')),
+                  child: Center(child: Text('No food matching the search criteria was found.')),
                 )
               else
                 Expanded(
@@ -106,7 +103,7 @@ class _FoodListScreenState extends State<FoodListScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => Navigator.pushNamed(context, AppRoutes.addFood),
         icon: const Icon(Icons.restaurant_menu_rounded),
-        label: const Text('Define a New Food'),
+        label: const Text('Add Custom Food'),
       ),
     );
   }
@@ -144,7 +141,7 @@ class _FoodListScreenState extends State<FoodListScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     final amount = double.tryParse(amountController.text);
                     if (amount != null && amount > 0) {
                       final logProv = context.read<DailyLogProvider>();
@@ -153,12 +150,18 @@ class _FoodListScreenState extends State<FoodListScreen> {
                         foodItemId: item.id!,
                         consumedAmount: amount,
                       );
-                      logProv.addLog(newLog, item);
-                      Navigator.pop(context);
-                      Navigator.pop(context);
+
+                      // Hata fırlatma ihtimaline karşı await eklendi
+                      await logProv.addLog(newLog, item);
+
+                      if (context.mounted) {
+                        Navigator.pop(context); // BottomSheet'i kapat
+                        // Kullanıcı deneyimini artırmak için Dashboard'a geri dön
+                        Navigator.popUntil(context, ModalRoute.withName(AppRoutes.dashboard));
+                      }
                     }
                   },
-                  child: const Text('Save to My Daily consumer'),
+                  child: const Text('Add to Daily Log'),
                 ),
               )
             ],
