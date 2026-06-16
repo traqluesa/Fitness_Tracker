@@ -24,7 +24,7 @@ class DailyLogProvider extends ChangeNotifier {
   Map<String, MacroSummary> _historySummaries = {};
 
   bool _isLoading = false;
-  String? _errorMessage; // Hata yönetimi için eklendi
+  String? _errorMessage;
 
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
@@ -69,7 +69,7 @@ class DailyLogProvider extends ChangeNotifier {
           .whereType<DailyLogEntry>()
           .toList();
     } catch (e) {
-      _errorMessage = "Günlük veriler yüklenirken bir hata oluştu.";
+      _errorMessage = "An error occurred while loading daily data.";
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -84,7 +84,27 @@ class DailyLogProvider extends ChangeNotifier {
       _todayEntries.add(DailyLogEntry(log: savedLog, foodItem: foodItem));
       notifyListeners();
     } catch (e) {
-      _setError("Öğün kaydedilemedi, lütfen tekrar deneyin.");
+      _setError("The meal could not be saved, please try again.");
+    }
+  }
+
+  Future<void> updateLog(DailyLog updatedLog, FoodItem foodItem) async {
+    try {
+      await _repository.updateLog(updatedLog);
+
+      final logIndex = _todayLogs.indexWhere((l) => l.id == updatedLog.id);
+      if (logIndex != -1) {
+        _todayLogs[logIndex] = updatedLog;
+      }
+
+      final entryIndex = _todayEntries.indexWhere((e) => e.log.id == updatedLog.id);
+      if (entryIndex != -1) {
+        _todayEntries[entryIndex] = DailyLogEntry(log: updatedLog, foodItem: foodItem);
+      }
+
+      notifyListeners();
+    } catch (e) {
+      _setError("Meal could not be updated.");
     }
   }
 
@@ -95,7 +115,7 @@ class DailyLogProvider extends ChangeNotifier {
       _todayEntries.removeWhere((e) => e.log.id == logId);
       notifyListeners();
     } catch (e) {
-      _setError("Öğün silinemedi.");
+      _setError("The meal could not be deleted.");
     }
   }
 
@@ -113,7 +133,7 @@ class DailyLogProvider extends ChangeNotifier {
         _historySummaries[date] = _nutritionService.calculateDailyTotals(logs, foodItems);
       }
     } catch (e) {
-      _errorMessage = "Geçmiş veriler yüklenemedi.";
+      _errorMessage = "Failed to load historical data.";
     } finally {
       _isLoading = false;
       notifyListeners();

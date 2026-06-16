@@ -10,25 +10,48 @@ class FoodProvider extends ChangeNotifier {
   List<FoodItem> _allItems = [];
   List<FoodItem> _filteredItems = [];
   String _searchQuery = '';
+
   bool _isLoading = false;
+  String? _errorMessage;
 
   bool get isLoading => _isLoading;
+  String? get errorMessage => _errorMessage;
   List<FoodItem> get allItems => _allItems;
 
-  /// Displays filtered results when searching, all items otherwise.
+
   List<FoodItem> get displayedItems =>
       _searchQuery.isEmpty ? _allItems : _filteredItems;
 
-  /// Map of id → FoodItem for O(1) lookups in DailyLogProvider.
+
   Map<int, FoodItem> get foodItemsMap =>
       {for (final f in _allItems) if (f.id != null) f.id!: f};
 
+  void _setError(String message) {
+    _errorMessage = message;
+    notifyListeners();
+  }
+
+  void clearError() {
+    if (_errorMessage != null) {
+      _errorMessage = null;
+      notifyListeners();
+    }
+  }
+
   Future<void> loadFoodItems() async {
     _isLoading = true;
+    _errorMessage = null;
     notifyListeners();
+
     try {
       _allItems = await _repository.getAllFoodItems();
-      _filteredItems = _allItems;
+      if (_searchQuery.isNotEmpty) {
+        _filteredItems = await _repository.searchFoodItems(_searchQuery);
+      } else {
+        _filteredItems = _allItems;
+      }
+    } catch (e) {
+      _setError("An error occurred while loading nutritional data.");
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -42,19 +65,41 @@ class FoodProvider extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    _filteredItems = await _repository.searchFoodItems(query);
-    notifyListeners();
+
+    try {
+      _filteredItems = await _repository.searchFoodItems(query);
+      notifyListeners();
+    } catch (e) {
+      _setError("An error occurred during the search.");
+    }
   }
 
   Future<void> addFoodItem(FoodItem item) async {
-    await _repository.addFoodItem(item);
-    await loadFoodItems(); // Reload to receive the DB-assigned id
+    try {
+      await _repository.addFoodItem(item);
+      await loadFoodItems();
+    } catch (e) {
+      _setError("Food could not be added, please try again.");
+    }
+  }
+
+  Future<void> updateFoodItem(FoodItem item) async {
+    try {
+      await _repository.updateFoodItem(item);
+      await loadFoodItems();
+    } catch (e) {
+      _setError("The Food could not be updated.");
+    }
   }
 
   Future<void> deleteFoodItem(int id) async {
-    await _repository.deleteFoodItem(id);
-    _allItems.removeWhere((f) => f.id == id);
-    _filteredItems.removeWhere((f) => f.id == id);
-    notifyListeners();
+    try {
+      await _repository.deleteFoodItem(id);
+      _allItems.removeWhere((f) => f.id == id);
+      _filteredItems.removeWhere((f) => f.id == id);
+      notifyListeners();
+    } catch (e) {
+      _setError("Food could not be deleted.");
+    }
   }
 }

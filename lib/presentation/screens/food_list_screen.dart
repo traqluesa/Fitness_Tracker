@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/app_routes.dart';
-import '../../data/models/food_item.dart';
 import '../providers/food_provider.dart';
+import '../providers/daily_log_provider.dart';
+import '../../data/models/daily_log.dart';
+import '../../data/models/food_item.dart';
 
 class FoodListScreen extends StatefulWidget {
   const FoodListScreen({super.key});
@@ -12,7 +14,7 @@ class FoodListScreen extends StatefulWidget {
 }
 
 class _FoodListScreenState extends State<FoodListScreen> {
-  final _searchCtrl = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -24,158 +26,145 @@ class _FoodListScreenState extends State<FoodListScreen> {
 
   @override
   void dispose() {
-    _searchCtrl.dispose();
+    _searchController.dispose();
     super.dispose();
-  }
-
-  void _clearSearch() {
-    _searchCtrl.clear();
-    context.read<FoodProvider>().searchFoodItems('');
-    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Food Library'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add_circle_outline_rounded),
-            tooltip: 'Add Custom Food',
-            onPressed: () async {
-              await Navigator.pushNamed(context, AppRoutes.addFood);
-              if (mounted) context.read<FoodProvider>().loadFoodItems();
-            },
-          ),
-          const SizedBox(width: 4),
-        ],
+        title: const Text('Food Selection'),
       ),
-      body: Column(
-        children: [
-          // ── Search Bar ──────────────────────────────────────────
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-            child: TextField(
-              controller: _searchCtrl,
-              textInputAction: TextInputAction.search,
-              decoration: InputDecoration(
-                hintText: 'Search foods…',
-                prefixIcon: const Icon(Icons.search_rounded),
-                suffixIcon: _searchCtrl.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear_rounded),
-                        onPressed: _clearSearch,
-                      )
-                    : null,
-                contentPadding: EdgeInsets.zero,
-              ),
-              onChanged: (q) {
-                setState(() {});          // Rebuild for suffixIcon
-                context.read<FoodProvider>().searchFoodItems(q);
-              },
-            ),
-          ),
+      body: Consumer<FoodProvider>(
+        builder: (context, foodProv, child) {
 
-          // ── List ────────────────────────────────────────────────
-          Expanded(
-            child: Consumer<FoodProvider>(
-              builder: (_, provider, __) {
-                if (provider.isLoading) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+          if (foodProv.errorMessage != null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(foodProv.errorMessage!),
+                  backgroundColor: Colors.redAccent,
+                ),
+              );
+              foodProv.clearError();
+            });
+          }
 
-                final items = provider.displayedItems;
+          return Column(
+            children: [
 
-                if (items.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.search_off_rounded,
-                            size: 56, color: Colors.grey.shade300),
-                        const SizedBox(height: 12),
-                        Text(
-                          'No foods found.',
-                          style: TextStyle(
-                              color: Colors.grey.shade500, fontSize: 15),
-                        ),
-                      ],
+              Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (query) => foodProv.searchFoodItems(query),
+                  decoration: InputDecoration(
+                    hintText: 'Search for food...',
+                    prefixIcon: const Icon(Icons.search_rounded),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                      icon: const Icon(Icons.clear_rounded),
+                      onPressed: () {
+                        _searchController.clear();
+                        foodProv.searchFoodItems('');
+                      },
+                    )
+                        : null,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                  );
-                }
+                  ),
+                ),
+              ),
 
-                return ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                  itemCount: items.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 6),
-                  itemBuilder: (_, i) => _FoodTile(food: items[i]),
-                );
-              },
-            ),
-          ),
-        ],
+              if (foodProv.isLoading)
+                const Expanded(child: Center(child: CircularProgressIndicator()))
+              else if (foodProv.displayedItems.isEmpty)
+                const Expanded(
+                  child: Center(child: Text('No food matching the search criteria was found..')),
+                )
+              else
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: foodProv.displayedItems.length,
+                    itemBuilder: (context, index) {
+                      final item = foodProv.displayedItems[index];
+                      return ListTile(
+                        title: Text(item.name),
+                        subtitle: Text('100g = ${item.calories.toStringAsFixed(0)} kcal • P: ${item.proteinG}g'),
+                        trailing: const Icon(Icons.add_circle_outline_rounded, color: Colors.green),
+                        onTap: () => _showLogMealBottomSheet(context, item),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => Navigator.pushNamed(context, AppRoutes.addFood),
+        icon: const Icon(Icons.restaurant_menu_rounded),
+        label: const Text('Define a New Food'),
       ),
     );
   }
-}
 
-class _FoodTile extends StatelessWidget {
-  final FoodItem food;
-
-  const _FoodTile({required this.food});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: CircleAvatar(
-          backgroundColor: const Color(0xFF16A34A).withOpacity(0.12),
-          child: Text(
-            food.name[0].toUpperCase(),
-            style: const TextStyle(
-              color: Color(0xFF16A34A),
-              fontWeight: FontWeight.bold,
-            ),
+  void _showLogMealBottomSheet(BuildContext context, FoodItem item) {
+    final amountController = TextEditingController(text: '100');
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+            left: 16,
+            right: 16,
+            top: 20,
           ),
-        ),
-        title: Text(
-          food.name,
-          style:
-              const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 2),
-            Text(
-              '${food.calories.toStringAsFixed(0)} kcal '
-              '/ ${food.portionG.toStringAsFixed(0)} g',
-              style: TextStyle(
-                  fontSize: 12, color: Colors.grey.shade600),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              'P ${food.proteinG.toStringAsFixed(1)} g  ·  '
-              'C ${food.carbG.toStringAsFixed(1)} g  ·  '
-              'F ${food.fatG.toStringAsFixed(1)} g',
-              style: TextStyle(
-                  fontSize: 11, color: Colors.grey.shade500),
-            ),
-          ],
-        ),
-        isThreeLine: true,
-        trailing: const Icon(Icons.chevron_right_rounded,
-            color: Colors.grey),
-        onTap: () => Navigator.pushNamed(
-          context,
-          AppRoutes.foodDetail,
-          arguments: food,
-        ),
-      ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(item.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              Text('Reference Serving Value: ${item.portionG.toStringAsFixed(0)}g'),
+              const SizedBox(height: 16),
+              TextField(
+                controller: amountController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'How many grams did you consume?',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    final amount = double.tryParse(amountController.text);
+                    if (amount != null && amount > 0) {
+                      final logProv = context.read<DailyLogProvider>();
+                      final newLog = DailyLog(
+                        date: logProv.todayDate,
+                        foodItemId: item.id!,
+                        consumedAmount: amount,
+                      );
+                      logProv.addLog(newLog, item);
+                      Navigator.pop(context);
+                      Navigator.pop(context);
+                    }
+                  },
+                  child: const Text('Save to My Daily consumer'),
+                ),
+              )
+            ],
+          ),
+        );
+      },
     );
   }
 }

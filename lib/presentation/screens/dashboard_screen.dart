@@ -44,10 +44,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(width: 4),
         ],
       ),
-      // Consumer kullanırken hata durumlarını yakalamak için yapılandırıldı
       body: Consumer2<FoodProvider, DailyLogProvider>(
         builder: (context, foodProv, logProv, child) {
-          // Hata varsa kullanıcıya SnackBar ile göster ve hatayı temizle
+
           if (logProv.errorMessage != null) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -82,7 +81,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Hedef protein miktarını 150-200g bandında tutmak için ayarlanmış bar
                 ProteinProgressBar(
                   current: summary.totalProtein,
                   goalMin: 150,
@@ -163,6 +161,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       key: ValueKey(e.log.id),
                       entry: e,
                       onDelete: () => context.read<DailyLogProvider>().deleteLog(e.log.id!),
+                      onEdit: () => _showEditPortionDialog(context, e), // <-- DÜZENLEME BURAYA BAĞLANDI
                     ),
                   ),
               ],
@@ -175,6 +174,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
         icon: const Icon(Icons.add_rounded),
         label: const Text('Log Meal'),
       ),
+    );
+  }
+
+  void _showEditPortionDialog(BuildContext context, DailyLogEntry entry) {
+    final textController = TextEditingController(text: entry.log.consumedAmount.toStringAsFixed(0));
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('${entry.foodItem.name} Edit'),
+          content: TextField(
+            controller: textController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'Amount Consumed',
+              suffixText: 'g',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final newAmount = double.tryParse(textController.text);
+                if (newAmount != null && newAmount > 0) {
+                  final updatedLog = entry.log.copyWith(consumedAmount: newAmount);
+
+                  context.read<DailyLogProvider>().updateLog(updatedLog, entry.foodItem);
+                }
+                Navigator.pop(context);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
     );
   }
 }
